@@ -24,6 +24,9 @@ class Normalizer(object):
         self.Xm = Xm
         self.Xs = Xs
 
+    def __str__(self):
+        return "Normalizer(%s)" % self.model
+
     def fit(self, X, y, *args, **kwargs):
         self.Xm = X.mean(axis=0)
         X = X - self.Xm

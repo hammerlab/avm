@@ -5,7 +5,40 @@ from sklearn.cross_validation import cross_val_score
 import numpy as np
 from helpers import Normalizer, class_prob, roc_auc, all_combinations
 
-def evaluate(X, Y, candidate_models, n_folds = 5):
+def find_best_model(X, Y, model_class, param_grids, n_folds=5):
+    curr_best_auc = 0
+    curr_best_model = None
+    curr_best_params = None
+
+    for i, param_grid in enumerate(param_grids):
+        print "Param_grid #%d/%d" % (i+1, len(param_grids)), param_grid
+        for param_combination in all_combinations(param_grid):
+            for k,v in param_combination.iteritems():
+                assert type(v) != list, "Can't give a list of parameters for %s" % k
+            curr_model = model_class(**param_combination)
+            print "--", curr_model
+
+            normalized = Normalizer(curr_model)
+            # nested cross validation over just the current training set
+            # to evaluate each parameter set's performance
+            nested_kfold = KFold(len(Y), n_folds, shuffle=False)
+            curr_aucs = []
+            for (nested_train_idx, nested_test_idx) in nested_kfold:
+                normalized.fit(X[nested_train_idx, :], Y[nested_train_idx])
+                curr_auc = roc_auc(normalized, X[nested_test_idx, :], Y[nested_test_idx])
+                curr_aucs.append(curr_auc)
+            curr_auc = np.mean(curr_aucs)
+            print "-- AUC: %0.4f" % curr_auc
+            print
+            if curr_auc > curr_best_auc:
+                curr_best_auc = curr_auc
+                curr_best_model = normalized
+                curr_best_params = param_combination
+    print "== Best Model: %s, AUC = %0.4f" % (curr_best_model.model, curr_best_auc)
+    print
+    return curr_best_model, curr_best_params, curr_best_auc
+
+def evaluate(X, Y, candidate_models, n_folds=5):
     n_samples, n_features = X.shape
     assert len(Y) == n_samples
 
@@ -32,39 +65,10 @@ def evaluate(X, Y, candidate_models, n_folds = 5):
             if not isinstance(param_grids, list):
                 assert isinstance(param_grids, dict), type(param_grids)
                 param_grids = [param_grids]
-
-            curr_best_auc = 0
-            curr_best_model = None
-            curr_best_params = None
             name = model.__class__.__name__
             print "Base Model", model
+            curr_best_model, curr_best_params, _ = find_best_model(X_train, Y_train, model.__class__, param_grids)
 
-            for i, param_grid in enumerate(param_grids):
-                print "Param_grid #%d/%d" % (i+1, len(param_grids)), param_grid
-                for param_combination in all_combinations(param_grid):
-                    for k,v in param_combination.iteritems():
-                        assert type(v) != list, "Can't give a list of parameters for %s" % k
-                    curr_model = model.__class__(**param_combination)
-                    print "--", curr_model
-
-                    normalized = Normalizer(curr_model)
-                    # nested cross validation over just the current training set
-                    # to evaluate each parameter set's performance
-                    nested_kfold = KFold(len(Y_train), n_folds, shuffle=False)
-                    curr_aucs = []
-                    for (nested_train_idx, nested_test_idx) in nested_kfold:
-                        normalized.fit(X_train[nested_train_idx, :], Y_train[nested_train_idx])
-                        curr_auc = roc_auc(normalized, X_train[nested_test_idx, :], Y_train[nested_test_idx])
-                        curr_aucs.append(curr_auc)
-                    curr_auc = np.mean(curr_aucs)
-                    print "-- AUC: %0.4f" % curr_auc
-                    print
-                    if curr_auc > curr_best_auc:
-                        curr_best_auc = curr_auc
-                        curr_best_model = normalized
-                        curr_best_params = param_combination
-            print "== Best Model for %s = %s, AUC = %0.4f" % (name, curr_best_model.model, curr_best_auc)
-            print
             # have to select the '.model' field since these are all Normalized objects
             curr_fold_models[name] = (curr_best_model, curr_best_params)
         print
