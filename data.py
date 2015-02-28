@@ -11,10 +11,15 @@ def create_datasets(df):
     # split the UVA and Pennsylvania datasets
     (_, uva), (_, pa) = df.groupby('CENTER')
     print("Extracting features for UVA")
-    X_uva, Y_uva = create_dataset(uva)
+    X_uva, Y_uva, cols_uva = create_dataset(uva)
     print("Extracting features for PA")
-    X_pa, Y_pa = create_dataset(pa)
-    return {"uva" : (X_uva, Y_uva), "pa" : (X_pa, Y_pa)}
+    X_pa, Y_pa, cols_pa = create_dataset(pa)
+    assert cols_pa == cols_uva
+    return {
+        "uva" : (X_uva, Y_uva),
+        "pa" : (X_pa, Y_pa),
+        "features" : cols_pa
+    }
 
 def create_dataset(center_df):
     """
@@ -54,7 +59,7 @@ def create_dataset(center_df):
     X_filtered = np.array(df_in_filtered, dtype=float)
     print("X", X_filtered.shape, X_filtered.dtype)
     print("Y", Y_filtered.shape, Y_filtered.dtype)
-    return X_filtered, Y_filtered
+    return X_filtered, Y_filtered, tuple(df_in_filtered.columns)
 
 # which columns of AVM.xlsx are we using as features for prediction of
 # of AVM obliteration
@@ -113,10 +118,11 @@ feature_rename_dict = {
     'Hx of H' : 'History_of_Hemorrhage',
     'No drainv vein' : 'Number_Draining_Veins',
     'S-M (vein)' : 'SM_Vein',
-    'OP type' : 'Surgery'
+    'OP type' : 'Surgery',
+    'Max D' : 'Diameter'
 }
 
-def extract_features(df, log_transform_age=True, expand_location_feature=True):
+def extract_features(df, log_transform_age=True, expand_location_feature=True, dose_size_ratios=False):
     """
     Parameters
     ----------
@@ -161,6 +167,7 @@ def extract_features(df, log_transform_age=True, expand_location_feature=True):
                 n_missing, len(missing), column_name))
             bad_mask |= missing
 
+
     # expand Location feature after checking that it's not NaN
     if expand_location_feature:
         location = np.array(df_in['Location'])
@@ -171,6 +178,13 @@ def extract_features(df, log_transform_age=True, expand_location_feature=True):
         for location_code in xrange(2, 10):
             column_name = "Location_%d" % location_code
             df_in[column_name] = location == location_code
+
+    if dose_size_ratios:
+        for dose_feature in ['Max_Dose', 'Isodose', 'Marginal_Dose']:
+            for size_feature in ['Volume']:
+                new_column_name = "%s_over_%s" % (dose_feature, size_feature)
+                df_in[new_column_name] = df_in[dose_feature] / df_in[size_feature]
+
     has_all_feature_columns_mask = np.array(~bad_mask)
     print(df_in.dtypes)
     return df_in, has_all_feature_columns_mask
