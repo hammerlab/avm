@@ -1,4 +1,9 @@
-from __future__ import print_function
+from __future__ import print_function, absolute_divide
+
+import pandas as pd
+import numpy as np
+
+NaN = float("nan")
 
 def load_data(filename='AVM.xlsx'):
     df = pd.read_excel(filename)
@@ -11,7 +16,7 @@ def create_datasets(df):
     X_uva, Y_uva = create_dataset(uva)
     print("Extracting features for PA")
     X_pa, Y_pa = create_dataset(pa)
-    return {"uva" : (X_uva, Y_uva), "pa" : (X_pa, Y_pa)}
+    return {"uva": (X_uva, Y_uva), "pa": (X_pa, Y_pa)}
 
 def create_dataset(center_df):
     """
@@ -35,11 +40,7 @@ def create_dataset(center_df):
     assert len(Y_filtered) <= len(Y_all_rows) <= len(center_df)
     assert df_in_filtered <= len(df_in_all_rows) <= len(center_df)
     X_filtered = df_in_filtered.as_matrix()
-    print("X", X_filtered.shape, X_filtered.dtype)
-    print("Y", Y.shape, Y.dtype)
-    return X_filtered, Y_filtered
-
-
+    return X_filtered
 
 
 # which columns of AVM.xlsx are we using as features for prediction of
@@ -65,18 +66,17 @@ feature_columns = [
 
 # some of the columns are poorly named in the original data file
 feature_rename_dict = {
-    'Max dose (Gy)' : 'Max_Dose',
-    'age' : 'Age',
-    'Volume (mL)' : 'Volume',
-    'Associated ' : 'Aneurysm',
-    'Peri_MarginalDose(Gy)' : 'Marginal_Dose',
-    'Hx of H' : 'History_of_Hemorrhage',
-    'No drainv vein' : 'Number_Draining_Veins',
-    'S_M (size)' : "SM_Size",
-    'S-M (location)' : "SM_Location",
-    'S-M (vein)' : "SM_Vein",
+    'Max dose (Gy)': 'Max_Dose',
+    'age': 'Age',
+    'Volume (mL)': 'Volume',
+    'Associated ': 'Aneurysm',
+    'Peri_MarginalDose(Gy)': 'Marginal_Dose',
+    'Hx of H': 'History_of_Hemorrhage',
+    'No drainv vein': 'Number_Draining_Veins',
+    'S_M (size)': "SM_Size",
+    'S-M (location)': "SM_Location",
+    'S-M (vein)': "SM_Vein",
 }
-)
 
 
 def extract_features(df, log_transform_age=True, require_ric_values=False):
@@ -95,7 +95,7 @@ def extract_features(df, log_transform_age=True, require_ric_values=False):
     for filtering that DataFrame (and target values corresponding to each row)
     """
     df_in = df[feature_columns].copy()
-    df_in.rename(columns = feature_rename_dict, inplace = True)
+    df_in.rename(columns=feature_rename_dict, inplace=True)
 
     if log_transform_age:
         # log transform of age
@@ -108,7 +108,7 @@ def extract_features(df, log_transform_age=True, require_ric_values=False):
 
     # drop rows without information about radiation induced changes
     if require_ric_values:
-        empty_ric =  ~(df['RIC'].str.strip().str.len().isnull())
+        empty_ric = ~(df['RIC'].str.strip().str.len().isnull())
         ric_not_available = df['RIC'] == 9
         bad_mask |= empty_ric
         bad_mask |= ric_not_available
@@ -132,7 +132,7 @@ survival_outcome_columns = [
     'K-Mtime yrs',
 ]
 
-survival_outcome_rename_dict ={
+survival_outcome_rename_dict = {
     'K-Mtime yrs': 'Years',
 }
 
@@ -177,9 +177,9 @@ ric_columns = [
 ]
 
 ric_rename_dict = {
-    'Degree of RIC' : 'RIC_Degree',
-    'Permanet' : 'RIC_Permanent',
-    'S/S from RIC' : 'RIC_Symptoms',
+    'Degree of RIC': 'RIC_Degree',
+    'Permanet': 'RIC_Permanent',
+    'S/S from RIC': 'RIC_Symptoms',
 }
 
 def radiation_induced_changes(df):
@@ -189,7 +189,6 @@ def radiation_induced_changes(df):
     ric_df = df[ric_columns].rename(columns=ric_rename_dict).copy()
     ric_df['RIC'] = ric_df['RIC'].convert_objects(convert_numeric=True)
 
-
     ric_df['RIC_Symptoms'] = ric_df['RIC_Symptoms'].convert_objects(convert_numeric=True)
     ric_df['RIC_Symptoms'][ric_df.RIC_Symptoms == 0] = NaN
 
@@ -197,7 +196,6 @@ def radiation_induced_changes(df):
     ric_df['RIC_Permanent'] = ric_df['RIC_Permanent'].convert_objects(convert_numeric=True)
     ric_df['RIC_Permanent'][ric_df['RIC_Permanent'].isnull()] = 0
     ric_df['RIC_Permanent'] = ric_df['RIC_Permanent'].astype('bool')
-
 
     # absence of data indicated either by 9 or NaN, normalize to only use one
     ric_df['RIC'][ric_df['RIC'] == 9] = np.nan
@@ -215,25 +213,3 @@ def adverse_events(df):
     hemorrhage = df['Post GK H'] > 0
     ric_df = radiation_induced_changes(df)
     return hemorrhage | ric_df.RIC_Bad
-
-
-def early_ric(df, months=24):
-    """
-    Returns boolean mask corresponding to which patients experienced
-    radiation induced changes within the given threshold.
-    """
-    # some patients experience radiation induced changes
-    # if this is encoded as 1 in 'RIC', then the time
-    # until change is in the column 'RIC post GK'.
-    # otherwise, look up their last MRI in 'MR FU'
-    ric = df['RIC'][good].astype(bool)
-    ric_true_time = df['RIC post GK'][good]
-    ric_false_time = df['MR FU'][good]
-    ric_time = ric_true_time.copy()
-    ric_false_mask = ~ric
-    ric_time[ric_false_mask] = ric_false_time[ric_false_mask]
-
-    # cast to a float only once both RIC times and last MRI followup are both in the
-    # same series, otherwise we'll get missing values
-    ric_time = ric_time.astype(float)
-    return ric & (ric_time <= early_ric_months

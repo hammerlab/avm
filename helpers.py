@@ -9,7 +9,7 @@ def class_prob(model, X):
         return prob[:, -1]
     else:
         pred = model.decision_function(X)
-        if len(pred.shape) > 1 and pred.shape[1] ==1:
+        if len(pred.shape) > 1 and pred.shape[1] == 1:
             pred = pred[:, 0]
         assert len(pred.shape) == 1, pred.shape
         return pred
@@ -19,13 +19,17 @@ class Normalizer(object):
     Subtract mean and divide features by standard deviation
     before fitting/predicting
     """
-    def __init__(self, model, Xm = None, Xs = None):
+    def __init__(self, model, Xm=None, Xs=None):
         self.model = model
         self.Xm = Xm
         self.Xs = Xs
 
     def __str__(self):
         return "Normalizer(%s)" % self.model
+
+    @property
+    def coef_(self):
+        return self.model.coef_
 
     def fit(self, X, y, *args, **kwargs):
         self.Xm = X.mean(axis=0)
@@ -51,7 +55,7 @@ class Normalizer(object):
         return self.model.decision_function(X, *args, **kwargs)
 
     def get_params(self, deep=False):
-        return { 'Xm' : self.Xm, 'Xs': self.Xs, 'model' : self.model }
+        return {'Xm': self.Xm, 'Xs': self.Xs, 'model': self.model}
 
 def roc_auc(model, X, y):
     p = class_prob(model, X)
@@ -62,7 +66,7 @@ def normalize(X_train, X_test):
     X_train = X_train - Xm
     X_test = X_test - Xm
     Xs = X_train.std(axis=0)
-    Xs[Xs==0] = 1
+    Xs[Xs == 0] = 1
     X_train /= Xs
     X_test /= Xs
     return X_train, X_test

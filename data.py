@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, division, absolute_import
 
 import numpy as np
 import pandas as pd
@@ -40,53 +40,43 @@ def load_dataframe(filename=FILENAME):
         columns=ric_rename_dict).copy()
     return df
 
-def load_datasets(filename=FILENAME):
-    df = load_dataframe(filename)
-    datasets = create_datasets(df)
-    return datasets, df
-
+def load_datasets(
+        filename=FILENAME,
+        obliteration_years=4):
+    full_df = load_dataframe(filename)
+    datasets = create_dataset(
+        full_df,
+        obliteration_years=obliteration_years)
+    return datasets, full_df
 
 def combine_output_variables(oblit, adverse):
     """
     Combine two boolean series, one for positive outcomes (obliteration)
     and another for negative outcomes (adverse events), into a single
     categorical variable.
+
+    Returns vector of integers per patient:
+        0 = no obliteration, no adverse event
+        1 = adverse event (regardless of obliteration)
+        2 = obliteration, no adverse event
     """
-    only_oblit = (oblit > 0) & (adverse == 0)
-    # 0 = no obliteration, no adverse event
-    # 1 = adverse event (regardless of obliteration)
-    # 2 = obliteration, no adverse event
-    return 2 * only_oblit.astype(int) + (adverse > 0).astype(int)
+    oblit = np.array(oblit)
+    adverse = np.array(adverse)
+    output = np.zeros_like(oblit, dtype=int)
+    output[adverse > 0] = 1
+    output[(oblit > 0) & (adverse == 0)] = 2
+    return output
 
-
-def create_datasets(df):
-    # split the UVA and Pennsylvania datasets
-    (_, uva), (_, pa) = df.groupby('CENTER')
-    print("Extracting features for UVA")
-    X_uva, Y_uva, oblit_uva, adverse_uva, df_uva = create_dataset(uva)
-
-    cols_uva = tuple(df_uva.columns)
-
-    print("Extracting features for PA")
-    X_pa, Y_pa, adverse_pa, oblit_pa, df_pa = create_dataset(pa)
-
-    cols_pa = tuple(df_pa.columns)
-    assert cols_pa == cols_uva, set(cols_pa).difference(set(cols_uva))
-    return {
-        "uva": (X_uva, Y_uva, oblit_uva, adverse_uva, df_uva),
-        "pa": (X_pa, Y_pa, oblit_pa, adverse_pa, df_pa),
-        "features": cols_pa,
-    }
 
 def create_dataset(
-        center_df,
-        obliteration_years=4,
-        ric_years=4):
+        df,
+        obliteration_years=4):
     """
-    For each center, split its DataFrame into a set of features
-    X and a label series Y.
+    Create a set of features X and a label series Y but also
+    preserve other properties like VRAS and FP scores in their own
+    columns.
     """
-    df_in_all_rows, input_filter_mask = extract_features(center_df)
+    df_in_all_rows, input_filter_mask = extract_features(df)
 
     print("-- Row-wise feature mask len=%d, type=%s, dtype=%s, sum=%d" % (
         len(input_filter_mask),
@@ -95,7 +85,7 @@ def create_dataset(
         input_filter_mask.sum()))
 
     oblit_all_rows, followup_mask = survival_outcomes(
-        center_df, obliteration_years=obliteration_years)
+        df, obliteration_years=obliteration_years)
 
     print("-- Followup mask len=%d, type=%s, dtype=%s, sum=%d" % (
         len(followup_mask),
@@ -106,25 +96,37 @@ def create_dataset(
     combined_mask = input_filter_mask & followup_mask
     df_in_filtered = df_in_all_rows[combined_mask]
     oblit_filtered = oblit_all_rows[combined_mask]
+    FP_score = np.array(df["FP score"][combined_mask])
+    VRAS = np.array(df["VRAS"][combined_mask])
+    SM = np.array(df["SM"][combined_mask])
+    center = list(df["CENTER"][combined_mask])
     print(
         "-- Total patients=%d"
         ", Complete patient rows=%d"
         ", Patients with sufficient followup=%d"
         ", Dataset size=%d" % (
-            len(center_df),
+            len(df),
             len(df_in_all_rows[input_filter_mask]),
             len(oblit_all_rows[followup_mask]),
             len(oblit_filtered)))
-    assert len(oblit_filtered) <= len(oblit_all_rows) <= len(center_df)
-    assert len(df_in_filtered) <= len(df_in_all_rows) <= len(center_df)
+    assert len(oblit_filtered) <= len(oblit_all_rows) <= len(df)
+    assert len(df_in_filtered) <= len(df_in_all_rows) <= len(df)
     X_filtered = np.array(df_in_filtered, dtype=float)
-    print("X", X_filtered.shape, X_filtered.dtype)
-    print("oblit", oblit_filtered.shape, oblit_filtered.dtype)
 
-    adverse_all = adverse_events(center_df)
+    adverse_all = adverse_events(df)
     adverse_filtered = adverse_all[combined_mask]
     Y_filtered = combine_output_variables(oblit_filtered, adverse_filtered)
-    return X_filtered, Y_filtered, oblit_filtered, adverse_filtered, df_in_filtered
+    return {
+        "X": X_filtered,
+        "Y": Y_filtered,
+        "oblit": oblit_filtered,
+        "adverse": adverse_filtered,
+        "FP": FP_score,
+        "VRAS": VRAS,
+        "SM": SM,
+        "df_filtered": df_in_filtered,
+        "center": center,
+    }
 
 # which columns of AVM.xlsx are we using as features for prediction of
 # of AVM obliteration
@@ -183,7 +185,8 @@ def extract_features(
         df,
         log_transform_age=True,
         expand_location_feature=True,
-        dose_size_ratios=False):
+        marginal_dose_volume_product=False,
+        marginal_dose_area_product=True):
     """
     Parameters
     ----------
@@ -232,16 +235,26 @@ def extract_features(
         # grouping frontal (code #1) and insula (code #10)
         df_in['Location_frontal'] = (location == 1) | (location == 10)
         # loop over all location codes 2 .. 9
-        for location_code in xrange(2, 10):
+        for location_code in range(2, 10):
             column_name = "Location_%d" % location_code
             df_in[column_name] = location == location_code
 
-    if dose_size_ratios:
-        for dose_feature in ['Max_Dose', 'Isodose', 'Marginal_Dose']:
-            for size_feature in ['Volume']:
-                new_column_name = "%s_over_%s" % (dose_feature, size_feature)
-                df_in[new_column_name] = df_in[dose_feature] / df_in[size_feature]
+    if marginal_dose_volume_product:
+        for dose_feature in ['Marginal_Dose']:
+            for volume_feature in ['Volume']:
+                new_column_name = "%s_times_%s" % (dose_feature, volume_feature)
+                df_in[new_column_name] = df_in[dose_feature] * df_in[volume_feature]
 
+    if marginal_dose_area_product:
+        # volume of a sphere is 4/3*pi*r**3
+        volume_values = df_in['Volume']
+        radius_cubed = 3.0 * volume_values / (4.0 * 3.14159265359)
+        radius = radius_cubed ** (1 / 3.0)
+        # area of a sphere = 4 * pi * r**2
+        area_values = 4 * 3.14159265359 * radius ** 2
+        for dose_feature in ['Marginal_Dose']:
+            new_column_name = "%s_times_area" % (dose_feature,)
+            df_in[new_column_name] = df_in[dose_feature] * area_values
     has_all_feature_columns_mask = np.array(~bad_mask)
     print(df_in.dtypes)
     return df_in, has_all_feature_columns_mask
