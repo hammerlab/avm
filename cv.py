@@ -5,7 +5,7 @@ import numpy as np
 from helpers import Normalizer, roc_auc, all_combinations
 
 def find_best_model(
-        X, Y, model_class, param_grids,
+        X, Y, param_grids,
         n_folds=5,
         target_value=1,
         normalize_features=True):
@@ -13,11 +13,15 @@ def find_best_model(
     curr_best_model = None
     curr_best_params = None
 
-    for i, param_grid in enumerate(param_grids):
+    # if we were passed a single grid then turn it into a list since the
+    # code below expects multiple grids
+
+    for i, (model_class, param_grid) in enumerate(param_grids.items()):
         print("Param_grid #%d/%d" % (i + 1, len(param_grids)), param_grid)
         for param_combination in all_combinations(param_grid):
             for k, v in param_combination.iteritems():
                 assert type(v) != list, "Can't give a list of parameters for %s" % k
+
             curr_model = model_class(**param_combination)
             if normalize_features:
                 normalized = Normalizer(curr_model)

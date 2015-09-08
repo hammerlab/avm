@@ -1,4 +1,4 @@
-
+from __future__ import print_function, division, absolute_import
 import itertools
 
 from sklearn.metrics import roc_auc_score
@@ -72,8 +72,13 @@ def normalize(X_train, X_test):
     return X_train, X_test
 
 def all_combinations(param_grid):
+    keys = []
+    value_lists = []
+    for (key, value_list) in param_grid.items():
+        keys.append(key)
+        value_lists.append(value_list)
     return [
-                {key: value for (key, value) in zip(param_grid, values)}
+                {key: value for (key, value) in zip(keys, values)}
                 for values
-                in itertools.product(*param_grid.values())
+                in itertools.product(*value_lists)
     ]
