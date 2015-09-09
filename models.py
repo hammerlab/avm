@@ -21,9 +21,9 @@ def hyperparameter_grid(
         gradient_boosting=False,
         min_float_value=10.0**-4.0,
         max_float_value=100.0,
-        number_float_values=20,
+        number_float_values=12,
         min_small_int=2,
-        max_small_int=5):
+        max_small_int=4):
     grid = {}
     if logistic_regression:
         grid[LogisticRegression] = {
@@ -44,21 +44,21 @@ def hyperparameter_grid(
         grid[RandomForestClassifier] = {
             'criterion': ["gini"],
             'max_depth': [10, 20, 30],
-            'n_estimators': [50, 100, 150],
+            'n_estimators': [25, 50, 100],
             'min_samples_split': list(range(min_small_int, max_small_int + 1)),
         }
     if extra_trees:
         grid[ExtraTreesClassifier] = {
             'criterion': ["gini"],
             'max_depth': [10, 20, 30],
-            'n_estimators': [50, 100, 150],
+            'n_estimators': [25, 50, 100],
             'min_samples_split': list(range(min_small_int, max_small_int + 1)),
         }
     if gradient_boosting:
         grid[GradientBoostingClassifier] = {
             'learning_rate': log_spaced_range(min_float_value, 1.0, number_float_values),
             'subsample': [0.5, 1.0],
-            'n_estimators': [50, 100, 150],
+            'n_estimators': [25, 50, 100],
             'max_depth': list(range(min_small_int, max_small_int + 1)),
         }
     return grid

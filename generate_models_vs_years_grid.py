@@ -102,18 +102,24 @@ if __name__ == "__main__":
         aucs_array[year_index, model_index] = auc
 
     model_labels = list(model_to_index.keys())
-    model_labels = [x.replace("Classifier", "") for x in model_labels]
+    model_labels = [
+        x.replace("Classifier", "").replace("LinearSVC", "SVM").replace("Gradient", "")
+        for x in model_labels
+    ]
 
     year_labels = list(year_to_index.keys())
-    year_labels = [
-        "%d (n=%d)" % (year, dataset_sizes[year])
-    ]
+    print("Sample sizes:")
+    for year in year_labels:
+        print("Year=%d, n=%d" % (year, dataset_sizes[year]))
+
     heatmap = seaborn.heatmap(
         data=aucs_array,
         xticklabels=model_labels,
         yticklabels=year_labels,
-        linewidths=2.0)
-    heatmap.set_xlabel("Model")
-    heatmap.set_ylabel("Target Years Until AVM Obliteration")
+        linewidths=3.0)
+    # heatmap.set_xlabel("Model")
+    heatmap.set_ylabel("AVM Obliteration Time Horizon")
+    heatmap.set_title("AUC")
     if args.output_file:
         heatmap.get_figure().savefig(args.output_file)
+

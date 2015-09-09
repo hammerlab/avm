@@ -20,12 +20,12 @@ parser.add_argument("--plot-file",
     default="plot.png")
 
 parser.add_argument("--bootstrap-iters",
-    default=50,
+    default=35,
     type=int,
     help="Number of bootstrap iterations (controls # of lines on ROC curve)")
 
 parser.add_argument("--opacity",
-    default=0.2,
+    default=0.15,
     type=float,
     help="Alpha channel of plot")
 
@@ -57,9 +57,10 @@ def generate_roc_plot(
         target_value=1,
         n_random_splits=50,
         line_width=5,
-        alpha=0.2,
+        alpha=0.18,
         normalize_features=True,
-        filename="plot.png"):
+        filename="plot.png",
+        obliteration_years=5):
     models = []
     auc_scores = []
 
@@ -108,9 +109,8 @@ def generate_roc_plot(
             fpr,
             tpr,
             lw=line_width,
-            alpha=alpha if i > 0 else 1.0,
+            alpha=alpha if i > 0 else min(1.0, 2 * alpha),
             color=(0.15, 0.25, 0.7),
-            marker="1",
             label="Logistic Regression" if i == 0 else "_")
 
         # need to make VRAS negative for ROC curve since it's
@@ -120,9 +120,8 @@ def generate_roc_plot(
             VRAS_fpr,
             VRAS_tpr,
             lw=line_width,
-            alpha=alpha if i > 0 else 1.0,
+            alpha=alpha if i > 0 else min(1.0, 2 * alpha),
             color=(0.7, 0.25, 0.1),
-            marker="+",
             label="VRAS" if i == 0 else "_")
 
         # need to make FP negative for ROC curve since it's
@@ -132,9 +131,8 @@ def generate_roc_plot(
             FP_fpr,
             FP_tpr,
             lw=line_width,
-            alpha=alpha if i > 0 else 1.0,
+            alpha=alpha if i > 0 else min(1.0, 2 * alpha),
             color=(0.1, 0.75, 0.2),
-            marker=".",
             markersize=2.0,
             label="FP" if i == 0 else "_")
 
@@ -144,10 +142,9 @@ def generate_roc_plot(
         axes.plot(
             SM_fpr,
             SM_tpr,
-            alpha=alpha if i > 0 else 1.0,
+            alpha=alpha if i > 0 else min(1.0, 2 * alpha),
             lw=line_width,
             color=(0.7, 0.1, 0.4),
-            marker="2",
             markersize=2.0,
             label="SM" if i == 0 else "_")
 
@@ -163,7 +160,7 @@ def generate_roc_plot(
     # axes.legend()
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('ROC Curves')
+    plt.title('ROC Curves (Time Horizon = %d Years)' % obliteration_years)
     figure = axes.figure
     figure.savefig(filename)
     print("\n >>> Average AUC score across all bootstrap samples: %0.4f" % (
@@ -201,7 +198,8 @@ if __name__ == "__main__":
         alpha=args.opacity,
         line_width=args.line_width,
         normalize_features=not args.disable_feature_normalization,
-        filename=args.plot_file)
+        filename=args.plot_file,
+        obliteration_years=args.obliteration_years)
     feature_nonzero_counts = np.zeros(len(columns), dtype=int)
     for model in all_models:
         feature_nonzero_counts[model.coef_[0] != 0] += 1
