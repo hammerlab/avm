@@ -10,7 +10,7 @@ from sklearn.metrics import roc_curve
 import numpy as np
 import pylab as plt
 
-from helpers import roc_auc, class_prob
+from helpers import roc_auc, class_prob, cv_indices_generator
 import data
 import cv
 from models import hyperparameter_grid
@@ -44,26 +44,6 @@ parser.add_argument("--disable-feature-normalization",
     action="store_true",
     help="Don't subtract mean or divide by standard deviation")
 
-def cv_indices_generator(n_samples, n_iters, sample_with_replacement=False):
-    """
-    Generator returns (iteration, (train_indices, test_indices))
-    """
-    for i in range(n_iters):
-        n_train = 2 * n_samples // 3
-        if sample_with_replacement:
-            # bootstrap sampling training sets which are 2/3 of the full data
-            train_indices = np.random.randint(0, n_samples, n_train)
-            train_indices_set = set(train_indices)
-            test_indices = np.array([i for i in range(n_samples) if i not in train_indices_set])
-        else:
-            all_indices = np.arange(n_samples)
-            np.random.shuffle(all_indices)
-            train_indices = all_indices[:n_train]
-            test_indices = all_indices[n_train:]
-        print("# total = %d, # train = %d, # test = %d, max train index = %d" % (
-            n_samples, len(train_indices), len(test_indices), max(train_indices)))
-        assert len(train_indices) + len(test_indices) == n_samples
-        yield (i, (train_indices, test_indices))
 
 def generate_roc_plot(
         X,
@@ -99,12 +79,15 @@ def generate_roc_plot(
 
         # use cross-validation over the bootstrap training set
         # to choose hyperparameters
-        best_model, params, _ = cv.find_best_model(
+        overall_best_results, results_per_class = cv.find_best_model(
             X_train,
             Y_train,
             {classifier_class: classifier_hyperparameters},
             target_value=1,
             normalize_features=normalize_features)
+        best_model = overall_best_results.model
+        params = overall_best_results.params
+
         # fit the best hyperparameter model with the full bootstrap training
         # set
         best_model.fit(X_train, Y_train)
@@ -125,7 +108,7 @@ def generate_roc_plot(
             fpr,
             tpr,
             lw=line_width,
-            alpha=alpha,
+            alpha=alpha if i > 0 else 1.0,
             color=(0.15, 0.25, 0.7),
             marker="1",
             label="Logistic Regression" if i == 0 else "_")
@@ -137,7 +120,7 @@ def generate_roc_plot(
             VRAS_fpr,
             VRAS_tpr,
             lw=line_width,
-            alpha=alpha,
+            alpha=alpha if i > 0 else 1.0,
             color=(0.7, 0.25, 0.1),
             marker="+",
             label="VRAS" if i == 0 else "_")
@@ -149,7 +132,7 @@ def generate_roc_plot(
             FP_fpr,
             FP_tpr,
             lw=line_width,
-            alpha=alpha,
+            alpha=alpha if i > 0 else 1.0,
             color=(0.1, 0.75, 0.2),
             marker=".",
             markersize=2.0,
@@ -161,7 +144,7 @@ def generate_roc_plot(
         axes.plot(
             SM_fpr,
             SM_tpr,
-            alpha=alpha,
+            alpha=alpha if i > 0 else 1.0,
             lw=line_width,
             color=(0.7, 0.1, 0.4),
             marker="2",

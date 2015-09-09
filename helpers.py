@@ -1,6 +1,7 @@
 from __future__ import print_function, division, absolute_import
 import itertools
 
+import numpy as np
 from sklearn.metrics import roc_auc_score
 
 def class_prob(model, X):
@@ -13,49 +14,6 @@ def class_prob(model, X):
             pred = pred[:, 0]
         assert len(pred.shape) == 1, pred.shape
         return pred
-
-class Normalizer(object):
-    """
-    Subtract mean and divide features by standard deviation
-    before fitting/predicting
-    """
-    def __init__(self, model, Xm=None, Xs=None):
-        self.model = model
-        self.Xm = Xm
-        self.Xs = Xs
-
-    def __str__(self):
-        return "Normalizer(%s)" % self.model
-
-    @property
-    def coef_(self):
-        return self.model.coef_
-
-    def fit(self, X, y, *args, **kwargs):
-        self.Xm = X.mean(axis=0)
-        X = X - self.Xm
-        self.Xs = X.std(axis=0)
-        self.Xs[self.Xs == 0] = 1
-        X = X / self.Xs
-        self.model.fit(X, y, *args, **kwargs)
-
-    def predict(self, X, *args, **kwargs):
-        X = X - self.Xm
-        X /= self.Xs
-        return self.model.predict(X, *args, **kwargs)
-
-    def predict_proba(self, X, *args, **kwargs):
-        X = X - self.Xm
-        X /= self.Xs
-        return self.model.predict_proba(X, *args, **kwargs)
-
-    def decision_function(self, X, *args, **kwargs):
-        X = X - self.Xm
-        X /= self.Xs
-        return self.model.decision_function(X, *args, **kwargs)
-
-    def get_params(self, deep=False):
-        return {'Xm': self.Xm, 'Xs': self.Xs, 'model': self.model}
 
 def roc_auc(model, X, y):
     p = class_prob(model, X)
@@ -82,3 +40,24 @@ def all_combinations(param_grid):
                 for values
                 in itertools.product(*value_lists)
     ]
+
+def cv_indices_generator(n_samples, n_iters, sample_with_replacement=False):
+    """
+    Generator returns (iteration, (train_indices, test_indices))
+    """
+    for i in range(n_iters):
+        n_train = 2 * n_samples // 3
+        if sample_with_replacement:
+            # bootstrap sampling training sets which are 2/3 of the full data
+            train_indices = np.random.randint(0, n_samples, n_train)
+            train_indices_set = set(train_indices)
+            test_indices = np.array([i for i in range(n_samples) if i not in train_indices_set])
+        else:
+            all_indices = np.arange(n_samples)
+            np.random.shuffle(all_indices)
+            train_indices = all_indices[:n_train]
+            test_indices = all_indices[n_train:]
+        print("# total = %d, # train = %d, # test = %d, max train index = %d" % (
+            n_samples, len(train_indices), len(test_indices), max(train_indices)))
+        assert len(train_indices) + len(test_indices) == n_samples
+        yield (i, (train_indices, test_indices))
