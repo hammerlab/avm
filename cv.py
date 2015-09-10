@@ -12,7 +12,7 @@ def find_best_model(
         X,
         Y,
         param_grids,
-        n_folds=5,
+        n_folds=10,
         target_value=1,
         normalize_features=True,
         shuffle=True):

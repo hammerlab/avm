@@ -21,7 +21,7 @@ def hyperparameter_grid(
         gradient_boosting=False,
         min_float_value=10.0**-4.0,
         max_float_value=100.0,
-        number_float_values=12,
+        number_float_values=50,
         min_small_int=2,
         max_small_int=4):
     grid = {}

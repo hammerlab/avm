@@ -111,7 +111,8 @@ if __name__ == "__main__":
     print("Sample sizes:")
     for year in year_labels:
         print("Year=%d, n=%d" % (year, dataset_sizes[year]))
-
+    print("AUCs")
+    print(aucs_dict)
     heatmap = seaborn.heatmap(
         data=aucs_array,
         xticklabels=model_labels,
