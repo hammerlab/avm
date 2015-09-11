@@ -2,14 +2,16 @@ import argparse
 from collections import OrderedDict
 
 import numpy as np
-import seaborn
+
 
 import data
 from models import hyperparameter_grid
 from cv import find_best_model
 
 import matplotlib
-matplotlib.use('qt4agg')  # Can also use 'tkagg' or 'webagg'
+matplotlib.use('agg')  # Can also use 'tkagg' or 'webagg'
+# has to be imported after renderer is set above
+import seaborn
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--plot-file",
@@ -51,6 +53,10 @@ parser.add_argument(
         default=None,
         type=int,
         help="Ignore all samples after this number is loaded")
+
+# parser.add_argument("--aucs-pickle-file", default=None, help="Use AUC data from pickle file instead of computing")
+
+parser.add_argument("--dpi", default=300, type=int)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -117,10 +123,11 @@ if __name__ == "__main__":
         data=aucs_array,
         xticklabels=model_labels,
         yticklabels=year_labels,
-        linewidths=3.0)
+        linewidths=3.0,
+        annot=True,
+        fmt=".2g")
     # heatmap.set_xlabel("Model")
     heatmap.set_ylabel("AVM Obliteration Time Horizon")
     heatmap.set_title("AUC")
     if args.output_file:
-        heatmap.get_figure().savefig(args.output_file)
-
+        heatmap.get_figure().savefig(args.output_file, dpi=args.dpi)

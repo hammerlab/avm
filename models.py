@@ -20,8 +20,8 @@ def hyperparameter_grid(
         extra_trees=False,
         gradient_boosting=False,
         min_float_value=10.0**-4.0,
-        max_float_value=100.0,
-        number_float_values=50,
+        max_float_value=10.0,
+        number_float_values=25,
         min_small_int=2,
         max_small_int=4):
     grid = {}
@@ -56,7 +56,7 @@ def hyperparameter_grid(
         }
     if gradient_boosting:
         grid[GradientBoostingClassifier] = {
-            'learning_rate': log_spaced_range(min_float_value, 1.0, number_float_values),
+            'learning_rate': log_spaced_range(min_float_value, 1.0, 8),
             'subsample': [0.5, 1.0],
             'n_estimators': [25, 50, 100],
             'max_depth': list(range(min_small_int, max_small_int + 1)),

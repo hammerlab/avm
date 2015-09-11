@@ -44,6 +44,7 @@ parser.add_argument("--disable-feature-normalization",
     action="store_true",
     help="Don't subtract mean or divide by standard deviation")
 
+parser.add_argument("--dpi", default=300, type=int)
 
 def generate_roc_plot(
         X,
@@ -54,13 +55,14 @@ def generate_roc_plot(
         SM,
         VRAS,
         FP,
+        obliteration_years=5,
+        normalize_features=True,
         target_value=1,
         n_random_splits=50,
         line_width=5,
         alpha=0.18,
-        normalize_features=True,
-        filename="plot.png",
-        obliteration_years=5):
+        dpi=300,
+        filename="plot.png"):
     models = []
     auc_scores = []
 
@@ -111,7 +113,7 @@ def generate_roc_plot(
             lw=line_width,
             alpha=alpha if i > 0 else min(1.0, 2 * alpha),
             color=(0.15, 0.25, 0.7),
-            label="Logistic Regression" if i == 0 else "_")
+            label="LR" if i == 0 else "_")
 
         # need to make VRAS negative for ROC curve since it's
         # anti-correlated with good outcomes
@@ -160,9 +162,9 @@ def generate_roc_plot(
     # axes.legend()
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('ROC Curves (Time Horizon = %d Years)' % obliteration_years)
+    plt.title('Time Horizon = %d Years' % obliteration_years)
     figure = axes.figure
-    figure.savefig(filename)
+    figure.savefig(filename, dpi=dpi)
     print("\n >>> Average AUC score across all bootstrap samples: %0.4f" % (
         np.mean(auc_scores),))
     return models
@@ -194,12 +196,13 @@ if __name__ == "__main__":
         VRAS=VRAS,
         FP=FP,
         target_value=1,
+        obliteration_years=args.obliteration_years,
+        normalize_features=not args.disable_feature_normalization,
         n_random_splits=args.bootstrap_iters,
         alpha=args.opacity,
+        dpi=args.dpi,
         line_width=args.line_width,
-        normalize_features=not args.disable_feature_normalization,
-        filename=args.plot_file,
-        obliteration_years=args.obliteration_years)
+        filename=args.plot_file)
     feature_nonzero_counts = np.zeros(len(columns), dtype=int)
     for model in all_models:
         feature_nonzero_counts[model.coef_[0] != 0] += 1

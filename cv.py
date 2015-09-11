@@ -45,7 +45,7 @@ def find_best_model(
                 normalized = curr_model
             # nested cross validation over just the current training set
             # to evaluate each parameter set's performance
-            nested_kfold = KFold(len(Y), n_folds, shuffle=True)
+            nested_kfold = KFold(len(Y), n_folds, shuffle=False)
             curr_aucs = []
             for (nested_train_idx, nested_test_idx) in nested_kfold:
                 normalized.fit(X[nested_train_idx, :], Y[nested_train_idx])

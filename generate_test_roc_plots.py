@@ -39,6 +39,7 @@ parser.add_argument("--disable-feature-normalization",
     action="store_true",
     help="Don't subtract mean or divide by standard deviation")
 
+parser.add_argument("--dpi", default=300, type=int)
 
 def generate_roc_plot(
         X_train,
@@ -55,6 +56,7 @@ def generate_roc_plot(
         line_width=5,
         normalize_features=True,
         opacity=1.0,
+        dpi=300,
         filename="plot.png",
         obliteration_years=5):
 
@@ -146,7 +148,7 @@ def generate_roc_plot(
     plt.ylabel('True Positive Rate')
     plt.title('Time Horizon = %d Years' % obliteration_years)
     figure = axes.figure
-    figure.savefig(filename)
+    figure.savefig(filename, dpi=dpi)
     return best_model
 
 if __name__ == "__main__":
@@ -188,18 +190,17 @@ if __name__ == "__main__":
         normalize_features=not args.disable_feature_normalization,
         filename=args.plot_file,
         opacity=args.opacity,
+        dpi=args.dpi,
         obliteration_years=args.obliteration_years)
     feature_nonzero_counts = np.zeros(len(test_columns), dtype=int)
     coefs = model.coef_.flatten()
     feature_nonzero_counts[coefs[0] != 0] += 1
     with open(args.coefs_file, "w") as f:
         f.write("%s\n" % model)
-        f.write("All features: %s\n" % (test_columns,))
         f.write("Feature Coefs (%d/%d)\n" % (
             sum(c != 0 for c in coefs),
             len(coefs)))
         for i in np.argsort(feature_nonzero_counts):
             feature = test_columns[i]
             coef = coefs[i]
-            if coef:
-                f.write("\t %30s: %0.4f\n" % (feature, coef))
+            f.write("\t %30s: %0.4f\n" % (feature, coef))
